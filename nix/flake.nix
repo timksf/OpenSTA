@@ -12,13 +12,26 @@
                 inherit system;
             };
             in { 
-                devShell = with pkgs; pkgs.mkShellNoCC {
-                    packages = with pkgs; [
-                        gcc13
-                        cmake
+                devShell = with pkgs; clangStdenv.mkDerivation rec {
+                    name = "opensta-dev";
+                    cmakeFlags = [
+                        "-DTCL_LIBRARY=${tcl}/lib/libtcl${clangStdenv.hostPlatform.extensions.sharedLibrary}"
+                        "-DTCL_HEADER=${tcl}/include/tcl.h"
+                    ];
+                    buildInputs = [
+                        tcl
+                        zlib
                         eigen
                     ];
-                };
+                    nativeBuildInputs = [
+                        swig
+                        pkg-config
+                        cmake
+                        gnumake
+                        flex
+                        bison
+                    ];
+                };                
             }
         );
 }

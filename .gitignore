@@ -21,6 +21,8 @@ app/sta
 app/libOpenSTA.*
 app/sta.exe
 app/sta.dSYM
+app/*.fst
+app/libfstapi.a
 
 # iverilog turd
 examples/gcd_tb

@@ -274,6 +274,23 @@ proc read_power_activities { args } {
 
 ################################################################
 
+define_cmd_args "read_power_activities_fst" { [-scope scope] -fst filename }
+
+proc read_power_activities_fst { args } {
+  parse_key_args "read_power_activities_fst" args \
+    keys {-scope} flags {-fst}
+
+  check_argc_eq1 "read_power_activities_fst" $args
+  set filename [file nativename [lindex $args 0]]
+  set scope ""
+  if { [info exists keys(-scope)] } {
+    set scope $keys(-scope)
+  }
+  read_fst_activities $filename $scope
+}
+
+################################################################
+
 proc power_find_nan { } {
   set corner [cmd_corner]
   foreach inst [network_leaf_instances] {

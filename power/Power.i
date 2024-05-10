@@ -22,6 +22,7 @@
 #include "power/Power.hh"
 #include "power/VcdReader.hh"
 #include "power/ReadVcdActivities.hh"
+#include "power/ReadFSTActivities.hh"
 
 using namespace sta;
 
@@ -119,6 +120,10 @@ report_vcd_var_values(const char *filename,
                       const char *var_name)
 {
   reportVcdVarValues(filename, var_name, Sta::sta());
+}
+
+void read_fst_activities(const char *filename, const char *scope){
+  readFSTActivities(filename, scope, Sta::sta());
 }
 
 %} // inline

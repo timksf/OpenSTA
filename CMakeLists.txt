@@ -46,7 +46,7 @@ message(STATUS "STA git sha: ${STA_GIT_SHA1}")
 
 # Default to bulding optimnized/release executable.
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE RELEASE)
+  set(CMAKE_BUILD_TYPE DEBUG)
 endif()
 
 message(STATUS "System name: ${CMAKE_SYSTEM_NAME}")
@@ -201,6 +201,9 @@ set(STA_SOURCE
   power/ReadVcdActivities.cc
   power/Vcd.cc
   power/VcdReader.cc
+  power/ReadFSTActivities.cc
+  power/FSTReader.cc
+  power/FST.cc
 
   util/Debug.cc
   util/DispatchQueue.cc
@@ -559,6 +562,14 @@ target_compile_options(OpenSTA
 # Disable compiler specific extensions like gnu++11.
 set_target_properties(OpenSTA PROPERTIES CXX_EXTENSIONS OFF)
 target_compile_features(OpenSTA PUBLIC cxx_std_11)
+
+###########################################################
+# libfst
+###########################################################
+
+add_subdirectory(libfst)
+
+target_link_libraries(OpenSTA fstapi)
 
 ###########################################################
 # Executable
