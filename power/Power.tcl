@@ -263,7 +263,7 @@ proc read_power_activities { args } {
   parse_key_args "read_power_activities" args \
     keys {-scope} flags {-vcd}
 
-  check_argc_eq1 "set_power_activity" $args
+  check_argc_eq1 "read_power_activities" $args
   set filename [file nativename [lindex $args 0]]
   set scope ""
   if { [info exists keys(-scope)] } {
