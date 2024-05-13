@@ -9,53 +9,28 @@
 #include "Debug.hh"
 #include "Sta.hh"
 #include "FST.hh"
+#include "FSTHierarchy.hh"
 
 namespace sta {
 
-    struct FSTVar;
-
-    struct FSTScope {
-        uint8_t type;
-        std::string name;
-        std::string component;
-    };
-
-    struct FSTVar {
-        uint8_t type;
-        std::string name;
-        uint32_t length;
-        fstHandle handle;
-        bool is_alias;
-    };
-
-    class FSTReader : public StaState {
-    /*
-        This FST reader flattens all scopes into the desired scope or the root scope if 
-        no scope is provided. This means that it accumulates a list of FSTVar for all variables
-        belonging to this scope and all children scopes.
-    */
-    public:
-        FSTReader(StaState *sta, const char *scope);
-        FST read(const char *filename);
-    private:
-        void *ctx_;
-        std::string scope_;
-        std::stack<FSTScope> scope_stack_;
-        std::vector<FSTVar> vars;
-    };
-
-    FSTReader::FSTReader(StaState *sta, const char *scope):
+    FSTReader::FSTReader(StaState *sta, const char *filename):
         StaState(sta),
-        scope_(scope)
+        filename_(filename)
         {
         debug_->setLevel("read_fst_activities", 8);
+        //open the context here and keep in memory until reader destroyed
+        ctx_ = fstReaderOpen(filename);
     }
 
-    FST FSTReader::read(const char *filename) {
+    FSTReader::~FSTReader(){
+        //clean up fst reader context
+        fstReaderClose(ctx_);
+    }
+
+    FST FSTReader::readHierarchy(const std::string &scope) {
         FST fst(this);
-        ctx_ = fstReaderOpen(filename);
         if(ctx_){
-            debugPrint(debug_, "read_fst_activities", 3, "Successfully opened fst context from file `%s`", filename);
+            debugPrint(debug_, "read_fst_activities", 3, "Successfully opened fst context from file `%s`", filename_.c_str());
             uint64_t start_time = fstReaderGetStartTime(ctx_);
             uint64_t end_time = fstReaderGetEndTime(ctx_);
             fst.setStartTime(start_time);
@@ -88,7 +63,9 @@ namespace sta {
 
             //read hierarchy for vars
             struct fstHier *h;
-            bool record_vars = false;
+            uint64_t scope_id;
+            bool found_scope = false;
+            FSTHierarchyTree hier_tree_{ this };
             while((h = fstReaderIterateHier(ctx_))){
                 switch(h->htyp){
                     case FST_HT_SCOPE: //scope begin
@@ -97,15 +74,15 @@ namespace sta {
                         new_scope.name = h->u.scope.name;
                         new_scope.component = h->u.scope.component;
                         new_scope.type = h->u.scope.typ;
-                        debugPrint(debug_, "read_fst_activities", 3, "Scope Name: %s", new_scope.name.c_str());
-                        scope_stack_.push(new_scope);
-                    }
-                    case FST_HT_UPSCOPE: //scope end, ignore if not building with a stack
-                        if(!scope_stack_.empty()) {
-                            scope_stack_.pop();
-                        } else {
-                            report_->error(7779, "Trailing UPSCOPE encountered with empty stack!");
+                        debugPrint(debug_, "read_fst_activities", 3, "Discovered scope with name: %s", new_scope.name.c_str());
+                        auto id = hier_tree_.push(new_scope);
+                        if((scope == "" || scope == new_scope.name) && !found_scope){ //remember scope id for later
+                            scope_id = id;
+                            found_scope = true;
                         }
+                    }
+                    case FST_HT_UPSCOPE:
+                        hier_tree_.pop();
                         break;
                     case FST_HT_VAR:
                     {
@@ -115,11 +92,12 @@ namespace sta {
                         new_var.length = h->u.var.length;
                         new_var.handle = h->u.var.handle;
                         new_var.is_alias = h->u.var.is_alias;
-                        debugPrint(debug_, "read_fst_activities", 3, "Var Name: %s, Length: %d", new_var.name.c_str(), new_var.length);
-                        if(scope_stack_.empty())
+                        debugPrint(debug_, "read_fst_activities", 3, "Var name: %s, Length: %d", new_var.name.c_str(), new_var.length);
+                        if(hier_tree_.empty())
                             report_->error(7779, "No scope for var: %s! Aborting...", new_var.name.c_str());
-                        FSTScope& current_scope = scope_stack_.top();
+                        FSTScope& current_scope = hier_tree_.peek_current();
                         current_scope.vars.push_back(new_var);
+                        debugPrint(debug_, "read_fst_activities", 3, "Added var %s to scope %s", new_var.name.c_str(), current_scope.name.c_str());
                     }
                     break;
                     //TODO:
@@ -128,17 +106,67 @@ namespace sta {
                     default : break;
                 }
             }
-
-            fstReaderClose(ctx_);
+            if(found_scope) {
+                std::vector<FSTScope> all_scopes;
+                auto [s, e] = hier_tree_.all_children(scope_id);
+                std::transform(s, e, std::back_inserter(all_scopes), [](FSTNode &node){ return node.value; });
+                debugPrint(debug_, "read_fst_activities", 3, "Scope %s has a total of %" PRIu64 " child scopes", scope.c_str(), all_scopes.size());
+                int i = 0;
+                for(auto &sc : all_scopes){
+                    debugPrint(debug_, "read_fst_activities", 3, "Child scope %d: %s", ++i, sc.name.c_str());
+                }
+                all_scopes.insert(all_scopes.begin(), hier_tree_.get(scope_id)); //add top level scope
+                std::vector<FSTVar> all_vars; //all relevant vars
+                for(auto &sc : all_scopes){
+                    //extend vars with those from all descendant scopes
+                    all_vars.insert(all_vars.end(), sc.vars.begin(), sc.vars.end());
+                }
+                debugPrint(debug_, "read_fst_activities", 3, "Accumulated %" PRIu64 " variables", all_vars.size());
+                fst.setVars(std::move(all_vars)); //transfer ownership to FST instance since it is no longer needed here
+            } else {
+                report_->error(7782, "Specified scope %s not found!", scope.c_str());
+            }
         } else {
-            report_->error(7777, "Failed to open fst context with file %s", filename);
+            report_->error(7777, "Failed to open fst context with file %s!", filename_.c_str());
         }
         return fst;
     }
 
-    FST readFSTFile(const char *filename, const char* scope, StaState *sta) {
-        FSTReader reader { sta, scope };
-        return reader.read(filename);
+    FSTValues FSTReader::readValuesForVar(FSTVar var) {
+        if(!ctx_) report_->error(7777, "FST context for file %s not open!", filename_.c_str());
+        FSTValues values;
+        bool error = false;
+        //let the API do the iteration
+        struct fst_iter_data {
+            Debug *debug;
+            Report *report;
+            FSTValues *v;
+            FSTVar *var;
+            bool *error;  
+        };
+        fst_iter_data usr_iter_data;
+        usr_iter_data.debug = this->debug_;
+        usr_iter_data.report = this->report_;
+        usr_iter_data.v = &values;
+        usr_iter_data.var = &var;
+        usr_iter_data.error = &error;
+        debugPrint(debug_, "read_fst_activities", 3, "Executing callback for %s", var.name.c_str());
+        fstReaderSetFacProcessMask(ctx_, var.handle);
+        fstReaderIterBlocks(ctx_,
+        +[](void *usr, uint64_t time, [[maybe_unused]] fstHandle facidx, const unsigned char *value){
+            struct fst_iter_data *usr_data = (struct fst_iter_data*) usr;
+            // debugPrint(usr_data->debug, "read_fst_activities", 3, "var %s@%" PRIu64 "=%s", usr_data->var->name.c_str(), time, value);
+            std::string value_s { reinterpret_cast<const char*>(value) };
+            if(value_s.length() != usr_data->var->length){
+                usr_data->report->warn(7789, "Variable length does not match value length: %" PRIu64 " vs %" PRIu32, value_s.length(), usr_data->var->length);
+                *usr_data->error = true; //do not want to throw exceptions in extern "C"
+            }
+            usr_data->v->push_back(FSTValue { time, value_s });
+        }, (void*)&usr_iter_data, nullptr);
+        fstReaderClrFacProcessMask(ctx_, var.handle);
+        if(error) 
+            report_->error(7890, "Encountered error during read of value changes");
+        return values;
     }
 
 } //namespace

@@ -45,4 +45,8 @@ namespace sta {
         total_cycles_ = t;
     }
 
+    void FST::setVars(std::vector<FSTVar> &&vars){
+        vars_ = vars;
+    }
+
 }

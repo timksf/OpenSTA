@@ -4,8 +4,18 @@
 
 namespace sta {
 
-class StaState;
+    class StaState;
 
-FST readFSTFile(const char *filename, StaState *sta);
+    class FSTReader : public StaState {
+    public:
+        FSTReader(StaState *sta, const char *filename);
+        ~FSTReader();
+        //the scope parameter acts as a filter
+        FST readHierarchy(const std::string &scope);
+        FSTValues readValuesForVar(FSTVar var);
+    private:
+        std::string filename_;
+        void *ctx_;
+    };
 
 } //namespace

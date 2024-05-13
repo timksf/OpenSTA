@@ -204,6 +204,7 @@ set(STA_SOURCE
   power/ReadFSTActivities.cc
   power/FSTReader.cc
   power/FST.cc
+  power/FSTHierarchy.cc
 
   util/Debug.cc
   util/DispatchQueue.cc
