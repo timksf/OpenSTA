@@ -11,7 +11,7 @@ namespace sta {
     class ReadFSTActivities : public StaState {
     public:
         ReadFSTActivities(const char *filename, const char *scope, Sta *sta);
-        void read();
+        void readActivities();
     private:
         Sta *sta_;
         std::string filename_;
@@ -21,7 +21,7 @@ namespace sta {
     //actual tcl function
     void readFSTActivities(const char *filename, const char *scope, Sta *sta) {
         ReadFSTActivities fst_act { filename, scope, sta };
-        fst_act.read();
+        fst_act.readActivities();
     }
 
     ReadFSTActivities::ReadFSTActivities(const char *filename, const char *scope, Sta *sta): 
@@ -33,8 +33,8 @@ namespace sta {
         debug_->setLevel("read_fst_activities", 8);
     };
 
-    void ReadFSTActivities::read() {
+    void ReadFSTActivities::readActivities() {
         debugPrint(debug_, "read_fst_activities", 3, "fst file: %s, scope: %s", filename_.c_str(), scope_.c_str());
-        readFSTFile(filename_.c_str(), sta_);
+        FST fst = readFSTFile(filename_.c_str(), sta_);
     }
 }

@@ -11,27 +11,26 @@ namespace sta {
     class FSTReader : public StaState {
     public:
         FSTReader(StaState *sta);
-        void read(const char *filename);
+        FST read(const char *filename);
     private:
-        FST fst_;
         void *ctx_;
     };
 
     FSTReader::FSTReader(StaState *sta):
-        StaState(sta),
-        fst_(sta)
+        StaState(sta)
         {
         debug_->setLevel("read_fst_activities", 8);
     }
 
-    void FSTReader::read(const char *filename) {
+    FST FSTReader::read(const char *filename) {
+        FST fst(this);
         ctx_ = fstReaderOpen(filename);
         if(ctx_){
             debugPrint(debug_, "read_fst_activities", 3, "Successfully opened fst context from file `%s`", filename);
             uint64_t start_time = fstReaderGetStartTime(ctx_);
             uint64_t end_time = fstReaderGetEndTime(ctx_);
-            fst_.setStartTime(start_time);
-            fst_.setEndTime(end_time);
+            fst.setStartTime(start_time);
+            fst.setEndTime(end_time);
             debugPrint(debug_, "read_fst_activities", 3, "Simulation from %" PRIu64 " to %" PRIu64, start_time, end_time);
             signed char time_scale_mag = fstReaderGetTimescale(ctx_);
             std::string time_unit;
@@ -46,14 +45,14 @@ namespace sta {
                 default: 
                     report_->error(7778, "Invalid time scale magnitude %d.", (int)time_scale_mag);
             }
-            fst_.setTimeUnit(time_unit, time_unit_scale);
+            fst.setTimeUnit(time_unit, time_unit_scale);
             debugPrint(debug_, "read_fst_activities", 3, "Time scale %le or `%s`", time_unit_scale, time_unit.c_str());
             std::string version { fstReaderGetVersionString(ctx_) };
             std::string date { fstReaderGetDateString(ctx_) };
             debugPrint(debug_, "read_fst_activities", 3, "Date: %s", date.c_str());
             debugPrint(debug_, "read_fst_activities", 3, "Version: %s", version.c_str());
-            fst_.setDate(date);
-            fst_.setVersionString(version);
+            fst.setDate(date);
+            fst.setVersionString(version);
             // int64_t start_cycle = (double)start_time * time_unit_scale;
             // int64_t end_cycle = (double)end_time * time_unit_scale;
             // int64_t total_cycles = (end_cycle - start_cycle) + 1;
@@ -62,13 +61,14 @@ namespace sta {
 
             fstReaderClose(ctx_);
         } else {
-            report_->warn(7777, "Failed to open fst context with file %s", filename);
+            report_->error(7777, "Failed to open fst context with file %s", filename);
         }
+        return fst;
     }
 
-    void readFSTFile(const char *filename, StaState *sta) {
+    FST readFSTFile(const char *filename, StaState *sta) {
         FSTReader reader { sta };
-        reader.read(filename);
+        return reader.read(filename);
     }
 
 } //namespace

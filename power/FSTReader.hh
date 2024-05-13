@@ -1,9 +1,11 @@
 #pragma once
 
+#include "FST.hh"
+
 namespace sta {
 
 class StaState;
 
-void readFSTFile(const char *filename, StaState *sta);
+FST readFSTFile(const char *filename, StaState *sta);
 
 } //namespace
