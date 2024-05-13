@@ -3,6 +3,7 @@
 #include <string>
 
 #include "Debug.hh"
+#include "Sdc.hh"
 #include "Sta.hh"
 #include "FSTReader.hh"
 
@@ -16,6 +17,7 @@ namespace sta {
         Sta *sta_;
         std::string filename_;
         std::string scope_;
+        double clk_period_;
     };
 
     //actual tcl function
@@ -28,7 +30,8 @@ namespace sta {
         StaState(sta),
         sta_(sta),
         filename_(filename),
-        scope_(scope)
+        scope_(scope),
+        clk_period_(0.0)
     {
         debug_->setLevel("read_fst_activities", 8);
     };
@@ -36,5 +39,11 @@ namespace sta {
     void ReadFSTActivities::readActivities() {
         debugPrint(debug_, "read_fst_activities", 3, "fst file: %s, scope: %s", filename_.c_str(), scope_.c_str());
         FST fst = readFSTFile(filename_.c_str(), sta_);
+
+        clk_period_ = INF;
+        for (Clock *clk : *sta_->sdc()->clocks())
+            clk_period_ = std::min(static_cast<double>(clk->period()), clk_period_);
+
+        debugPrint(debug_, "read_fst_activities", 3, "Clock period: %lf", clk_period_);
     }
 }
