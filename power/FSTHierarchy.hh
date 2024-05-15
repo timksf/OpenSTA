@@ -33,6 +33,7 @@ namespace sta {
         uint64_t push(FSTScope scope);
         void pop();
         FSTScope& peek_current();
+        std::string current_context();
         bool empty();
         std::pair<node_it, node_it> all_children(uint64_t id);
         FSTScope& get(uint64_t id);

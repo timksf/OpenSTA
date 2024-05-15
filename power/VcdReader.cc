@@ -19,6 +19,7 @@
 
 #include "VcdReader.hh"
 
+#include "Debug.hh"
 #include "Zlib.hh"
 #include "Report.hh"
 #include "Error.hh"
@@ -211,7 +212,7 @@ VcdReader::parseVar()
           name += ' ';
         name += tokens[4];
       }
-
+      debugPrint(debug_, "read_vcd_activities", 3, "Var name: %s, Length: %d", name.c_str(), width);
       vcd_->makeVar(name, type, width, id);
     }
   }

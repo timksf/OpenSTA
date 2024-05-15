@@ -29,6 +29,7 @@
 
 namespace sta {
 
+// using std::abs;
 using std::min;
 using std::to_string;
 
@@ -90,6 +91,7 @@ ReadVcdActivities::ReadVcdActivities(const char *filename,
   sta_(sta),
   power_(sta->power())
 {
+  // debug_->setLevel("read_vcd_activities", 8);
 }
 
 void

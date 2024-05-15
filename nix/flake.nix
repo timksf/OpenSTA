@@ -24,6 +24,9 @@
                         eigen
                     ];
                     nativeBuildInputs = [
+                        clang-tools
+                        lldb_15 #lldb_16 seems to be broken
+                        gdb
                         swig
                         pkg-config
                         cmake

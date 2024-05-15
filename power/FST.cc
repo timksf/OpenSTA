@@ -25,24 +25,16 @@ namespace sta {
         version_ = version;
     }
 
+    void FST::setTimeScale(double time_scale) {
+        time_scale_ = time_scale;
+    }
+
     void FST::setStartTime(uint64_t t){
         start_time_ = t;
     }
 
     void FST::setEndTime(uint64_t t){
         end_time_ = t;
-    }
-
-    void FST::setStartCycle(int64_t t){
-        start_cycle_ = t;
-    }
-
-    void FST::setEndCycle(int64_t t){
-        end_cycle_ = t;
-    }
-
-    void FST::setTotalCycles(int64_t t){
-        total_cycles_ = t;
     }
 
     void FST::setVars(std::vector<FSTVar> &&vars){

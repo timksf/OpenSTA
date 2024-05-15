@@ -21,10 +21,11 @@ namespace sta {
             new_node.n_children = 0;
             has_root_ = true;
         } else if(parents_.empty()) {
-            report_->error(7780, "Encountered FST hierarchy with multiple roots!");
+            report_->error(7780, "Encountered FST hierarchy with multiple roots (%s), aborting..", scope.name.c_str());
         } else { //insert simple child node
             new_node.value = scope;
             new_node.parent = parents_.back(); //parent id
+            debugPrint(debug_, "read_fst_activities", 10, "Adding scope %s with parent %s", scope.name.c_str(), nodes_[new_node.parent].value.name.c_str());
             new_node.n_children = 0;
         }
         nodes_.push_back(new_node);
@@ -47,6 +48,14 @@ namespace sta {
         }
         //this should not happen as we provide an empty() method
         report_->error(7781, "Tried to add FST var but no scope is available!");
+    }
+
+    std::string FSTHierarchyTree::current_context(){
+        std::string context = "";
+        for(auto &p : parents_){
+            context += nodes_[p].value.name + "/";
+        }
+        return context;
     }
 
     bool FSTHierarchyTree::empty(){

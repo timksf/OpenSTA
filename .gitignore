@@ -17,6 +17,8 @@ pvt
 
 include/sta/StaConfig.hh
 
+app/test
+app/*.txt
 app/sta
 app/libOpenSTA.*
 app/sta.exe

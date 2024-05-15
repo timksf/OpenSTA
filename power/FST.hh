@@ -43,16 +43,17 @@ namespace sta {
         FST(StaState *sta);
         void setDate(const std::string &date);
         void setTimeUnit(const std::string &time_unit, double time_unit_scale);
+        void setTimeScale(double ts);
         void setVersionString(const std::string &version);
         void setStartTime(uint64_t t);
         void setEndTime(uint64_t t);
         void setStartCycle(int64_t t);
-        void setEndCycle(int64_t t);
-        void setTotalCycles(int64_t t);
         void setVars(vvars_t &&vars);
 
-        inline uint64_t startTime() { return start_time_; }
-        inline uint64_t endTime() { return end_time_; }
+        inline uint64_t startTime() const { return start_time_; }
+        inline uint64_t endTime() const { return end_time_; }
+        inline double timeUnitScale() const { return time_unit_scale_; };
+        inline double timeScale() const { return time_scale_; }
 
         inline var_range vars() {
             return std::make_pair(vars_.begin(), vars_.end());
@@ -63,15 +64,10 @@ namespace sta {
 
         double time_unit_scale_;
         std::string time_unit_;
-        //FST does not support separate time unit and time unit scale AFAIK
-        static constexpr double time_scale = 1.0;
+        double time_scale_;
 
         uint64_t start_time_;
         uint64_t end_time_;
-
-        int64_t start_cycle_;
-        int64_t end_cycle_;
-        int64_t total_cycles_;
 
         vvars_t vars_;
     };

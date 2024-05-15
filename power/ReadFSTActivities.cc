@@ -21,9 +21,10 @@ namespace sta {
         ReadFSTActivities(const char *filename, const char *scope, Sta *sta);
         void readActivities();
         void setActivities();
-        void setVarActivity(FSTVar var);
+        void setVarActivity(FSTVar var, std::string &var_name);
         void setVarActivity(const std::string &var_name, const FSTValues &values, int bit);
         void findVarActivity(const FSTValues& vals, int value_bit, double &transition_count, double &activity, double &duty);
+        void checkClockPeriod(const Pin *pin, double transition_count);
     private:
         Sta *sta_;
         FST fst_;
@@ -63,14 +64,14 @@ namespace sta {
         for (Clock *clk : *sta_->sdc()->clocks())
             clk_period_ = std::min(static_cast<double>(clk->period()), clk_period_);
 
-        debugPrint(debug_, "read_fst_activities", 3, "Clock period: %lf", clk_period_);
+        debugPrint(debug_, "read_fst_activities", 3, "Clock period: %le", clk_period_);
 
         if(fst_.endTime() > 0){
             setActivities();
         } else {
             report_->warn(7784, "VCD max time is zero.");
         }
-
+        report_->reportLine("Annotated %lu pin activities.", annotated_pins_.size());
     }
 
     void ReadFSTActivities::setActivities() {
@@ -78,35 +79,45 @@ namespace sta {
         for(auto it = var_begin; it != var_end; ++it){
             FSTVar &var = *it;
             if(var.type == FST_VT_VCD_WIRE || var.type == FST_VT_VCD_REG){
-                setVarActivity(var);
+                //strip variable name of root scope prefix for lacating it in sdc network
+                std::string var_name = var.name;
+                if(scope_.length() > 0){
+                    if(var_name.substr(0, scope_.length()) == scope_){
+                        var_name = var_name.substr(scope_.length() + 1); //+1 removes `/`
+                    }
+                }
+                setVarActivity(var, var_name);
             }
         }
     }
 
-    void ReadFSTActivities::setVarActivity(FSTVar var){
+    void ReadFSTActivities::setVarActivity(FSTVar var, std::string &var_name){
         FSTValues vals = reader_.readValuesForVar(var);
         if(var.length == 1){ //simple case, single signal
-            std::string sta_name = netVerilogToSta(var.name.c_str());
-            debugPrint(debug_, "read_fst_activities", 3, "var name `%s` to sta name `%s`", var.name.c_str(), sta_name.c_str());
+            std::string sta_name = netVerilogToSta(var_name.c_str());
+            // debugPrint(debug_, "read_fst_activities", 3, "var name `%s` to sta name `%s`", var_name.c_str(), sta_name.c_str());
+            setVarActivity(sta_name, vals, 0);
         } else { //probably a bus signal
-            //in the FST format bus signals have the brackets separated from the signal with a space
-            auto delim_pos = var.name.find(' ');
-            var.name.erase(delim_pos, 1);
+            //remove space in front of range annotation in wide signal
+            auto delim_pos = var_name.find(' ');
+            var_name.erase(delim_pos, 1);
             bool is_bus, is_range, subscript_wild;
             std::string bus_name;
             int from, to;
-            parseBusName(var.name.c_str(), '[', ']', '\\',
+            parseBusName(var_name.c_str(), '[', ']', '\\',
                         is_bus, is_range, bus_name, from, to, subscript_wild);
             if (is_bus) {
                 std::string sta_bus_name = netVerilogToSta(bus_name.c_str());
-                debugPrint(debug_, "read_fst_activities", 3, "Parsed bus %s [%s] (from %d to %d)", bus_name.c_str(), sta_bus_name.c_str(), from, to);
+                debugPrint(debug_, "read_fst_activities", 10, "Parsed bus %s [%s] (from %d to %d)", 
+                    bus_name.c_str(), sta_bus_name.c_str(), from, to);
                 if(to < from) std::swap(to, from);
-                for(int i = to, value_bit = 0; i <= from; i++) {
+                for(int i = from, value_bit = 0; i <= to; i++) {
                     std::string pin_name = sta_bus_name + '[' + std::to_string(i) + ']';
+                    // debugPrint(debug_, "read_fst_activities", 3, "bus values %s", pin_name.c_str());
                     setVarActivity(pin_name, vals, value_bit++);
                 }
             } else
-                report_->warn(7791, "problem parsing bus %s.", var.name.c_str());
+                report_->warn(7791, "problem parsing bus %s.", var_name.c_str());
         }
     }
 
@@ -114,9 +125,16 @@ namespace sta {
         const Pin *pin = sdc_network_->findPin(pin_name.c_str());
         if(pin) {
             double transition_count, activity, duty;
+            debugPrint(debug_, "read_fst_activities", 3, "%s values", pin_name.c_str());
             findVarActivity(values, bit, transition_count, activity, duty);
+            debugPrint(debug_, "read_fst_activities", 3, "%s transitions %.1f activity %.2f duty %.2f", 
+                pin_name.c_str(), transition_count, activity, duty);
+            if(sdc_->isLeafPinClock(pin))
+                checkClockPeriod(pin, transition_count);
+            power_->setUserActivity(pin, activity, duty, PwrActivityOrigin::fst);
+            annotated_pins_.insert(pin);
         } else
-            report_->warn(7792, "could not find pin %s in sdc network", pin_name.c_str());
+            debugPrint(debug_, "read_fst_activities", 9, "could not find pin %s in sdc network", pin_name.c_str());
     }
 
     void ReadFSTActivities::findVarActivity(const FSTValues& vals, int value_bit, double &transition_count, double &activity, double &duty) {
@@ -127,7 +145,7 @@ namespace sta {
         for(auto &v : vals){
             uint64_t time = v.time;
             char value = v.value[value_bit];
-            debugPrint(debug_, "read_vcd_activities", 3, " %" PRId64 " %c", time, value);
+            debugPrint(debug_, "read_fst_activities", 3, " %" PRId64 " %c (from %s)", time, value, v.value.c_str());
             if(prev_value == '1')
                 high_time += time - prev_time;
             if(value != prev_value) //transition
@@ -140,11 +158,30 @@ namespace sta {
             prev_time = time;
             prev_value = value;
         }
-        auto endTime = fst_.endTime();
+        auto end_time = fst_.endTime();
         if(prev_value == '1')
-            high_time += fst_.endTime() - prev_time;
-        duty = static_cast<double>(high_time) / endTime;
-        // activity = transition_count / (endTime * fst_.time)//TODO;
+            high_time += end_time - prev_time;
+        duty = static_cast<double>(high_time) / end_time;
+        activity = transition_count / (end_time * fst_.timeScale() / clk_period_);//TODO;
+    }
+
+    void ReadFSTActivities::checkClockPeriod(const Pin *pin, double transition_count) {
+        uint64_t end_time = fst_.endTime();
+        debugPrint(debug_, "read_fst_activities", 10, "time scale %le", fst_.timeScale());
+        double sim_period = end_time * fst_.timeScale() / (transition_count / 2.0);
+        ClockSet *clks = sdc_->findLeafPinClocks(pin);
+        if (clks) {
+            for (Clock *clk : *clks) {
+                double clk_period = clk->period();
+                debugPrint(debug_, "read_fst_activities", 3, "sim_period of %s calculated as %le", clk->name(), sim_period);
+                if (abs((clk_period - sim_period) / clk_period) > .1)
+                    // Warn if sim clock period differs from SDC by 10%.
+                    report_->error(7793, "clock `%s` vcd period `%s` differs from SDC clock period `%s`",
+                                clk->name(),
+                                delayAsString(sim_period, this),
+                                delayAsString(clk_period, this));
+                }
+        }
     }
 
 }
