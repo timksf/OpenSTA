@@ -19,7 +19,7 @@ namespace sta {
         StaState(sta),
         filename_(filename)
         {
-        debug_->setLevel("read_fst_activities", 8);
+        // debug_->setLevel("read_fst_activities", 8);
         //open the context here and keep in memory until reader destroyed
         ctx_ = fstReaderOpen(filename);
     }
@@ -96,7 +96,10 @@ namespace sta {
                         new_scope.type = h->u.scope.typ;
                         debugPrint(debug_, "read_fst_activities", 10, "Discovered scope `%s`", new_scope.name.c_str());
                         auto id = hier_tree_.push(new_scope);
-                        if((scope == "" || scope == new_scope.name) && !found_scope){ //remember scope id for later
+                        std::string current_context = hier_tree_.current_context(); //the desired scope might be nested
+                        if(!current_context.empty())
+                            current_context.pop_back(); //remove trailing `/`
+                        if((scope == "" || scope == new_scope.name || scope == current_context) && !found_scope){ //remember scope id for later
                             debugPrint(debug_, "read_fst_activities", 3, "Added root scope `%s`", new_scope.name.c_str());
                             scope_id = id;
                             found_scope = true;

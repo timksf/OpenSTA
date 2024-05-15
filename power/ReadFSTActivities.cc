@@ -52,7 +52,7 @@ namespace sta {
         clk_period_(0.0),
         power_(sta->power())
     {
-        debug_->setLevel("read_fst_activities", 8);
+        // debug_->setLevel("read_fst_activities", 8);
     };
 
     void ReadFSTActivities::readActivities() {
@@ -176,7 +176,7 @@ namespace sta {
                 debugPrint(debug_, "read_fst_activities", 3, "sim_period of %s calculated as %le", clk->name(), sim_period);
                 if (abs((clk_period - sim_period) / clk_period) > .1)
                     // Warn if sim clock period differs from SDC by 10%.
-                    report_->error(7793, "clock `%s` vcd period `%s` differs from SDC clock period `%s`",
+                    report_->warn(7793, "clock `%s` vcd period `%s` differs from SDC clock period `%s`",
                                 clk->name(),
                                 delayAsString(sim_period, this),
                                 delayAsString(clk_period, this));
