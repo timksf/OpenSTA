@@ -121,6 +121,7 @@ namespace sta {
                         if(hier_tree_.empty())
                             report_->error(7779, "No scope for var: %s! Aborting...", new_var.name.c_str());
                         FSTScope& current_scope = hier_tree_.peek_current();
+                        // if(!new_var.is_alias)
                         current_scope.vars.push_back(new_var);
                         debugPrint(debug_, "read_fst_activities", 10, "Added var %s to scope %s", new_var.name.c_str(), current_scope.name.c_str());
                     }
@@ -195,6 +196,37 @@ namespace sta {
         if(error) 
             report_->error(7890, "Encountered error during read of value changes");
         return values;
+    }
+
+    void FSTReader::readAllValues(FST &fst){
+        if(!ctx_) report_->error(7777, "FST context for file %s not open!", filename_.c_str());
+        bool error = false;
+        uint64_t counter = 0;
+        struct fst_iter_data {
+            Report *report;
+            FST *fst;
+            bool *error;
+            uint64_t *ctr;
+        };
+        fst_iter_data usr_iter_data;
+        usr_iter_data.fst = &fst;
+        usr_iter_data.error = &error;
+        usr_iter_data.report = this->report_;
+        usr_iter_data.ctr = &counter;
+        fstReaderSetFacProcessMaskAll(ctx_); //enable callback for all values
+        fstReaderIterBlocks(ctx_,
+        +[](void *usr, uint64_t time, fstHandle facidx, const unsigned char *value){
+            struct fst_iter_data *usr_data = (struct fst_iter_data*) usr;
+            std::string value_s { reinterpret_cast<const char*>(value) };
+            std::reverse(value_s.begin(), value_s.end());
+            for(auto &c : value_s) c = std::toupper(c); //convert X and Z to upper case for later checks
+            usr_data->fst->insertValue(facidx, FSTValue { time, value_s });
+            (*usr_data->ctr)++;
+        }, (void*)&usr_iter_data, nullptr);
+        fstReaderClrFacProcessMaskAll(ctx_);
+        if(error) 
+            report_->error(7890, "Encountered error during read of value changes");
+        report_->reportLine("Read %" PRIu64 " value changes total", counter);
     }
 
 } //namespace

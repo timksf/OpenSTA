@@ -41,4 +41,8 @@ namespace sta {
         vars_ = vars;
     }
 
+    void FST::insertValue(fstHandle var_id, const FSTValue &value) {
+        var_values_map_[var_id].push_back(value);
+    }
+
 }

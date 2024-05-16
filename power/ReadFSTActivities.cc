@@ -59,7 +59,7 @@ namespace sta {
         debugPrint(debug_, "read_fst_activities", 3, "fst file: %s, scope: %s", filename_.c_str(), scope_.c_str());
         //the fst_ object will contain some general information and FSTVar's for all relevant variables (inside of scope_)
         fst_ = reader_.readHierarchy(scope_.c_str());
-
+        reader_.readAllValues(fst_);
         clk_period_ = INF; //TODO ??
         for (Clock *clk : *sta_->sdc()->clocks())
             clk_period_ = std::min(static_cast<double>(clk->period()), clk_period_);
@@ -83,7 +83,7 @@ namespace sta {
                 std::string var_name = var.name;
                 if(scope_.length() > 0){
                     if(var_name.substr(0, scope_.length()) == scope_){
-                        var_name = var_name.substr(scope_.length() + 1); //+1 removes `/`
+                        var_name = var_name.substr(scope_.length() + 1); //+1 removes trailing `/`
                     }
                 }
                 setVarActivity(var, var_name);
@@ -92,7 +92,8 @@ namespace sta {
     }
 
     void ReadFSTActivities::setVarActivity(FSTVar var, std::string &var_name){
-        FSTValues vals = reader_.readValuesForVar(var);
+        // FSTValues vals = reader_.readValuesForVar(var);
+        FSTValues &vals = fst_.valuesForVar(var);
         if(var.length == 1){ //simple case, single signal
             std::string sta_name = netVerilogToSta(var_name.c_str());
             // debugPrint(debug_, "read_fst_activities", 3, "var name `%s` to sta name `%s`", var_name.c_str(), sta_name.c_str());

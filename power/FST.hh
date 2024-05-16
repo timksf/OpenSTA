@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 #include <utility>
+#include <unordered_map>
 
 #include "fstapi.h"
 
@@ -49,6 +50,7 @@ namespace sta {
         void setEndTime(uint64_t t);
         void setStartCycle(int64_t t);
         void setVars(vvars_t &&vars);
+        void insertValue(fstHandle var_id, const FSTValue &value);
 
         inline uint64_t startTime() const { return start_time_; }
         inline uint64_t endTime() const { return end_time_; }
@@ -58,6 +60,10 @@ namespace sta {
         inline var_range vars() {
             return std::make_pair(vars_.begin(), vars_.end());
         };
+
+        inline FSTValues& valuesForVar(FSTVar &var) {
+            return var_values_map_[var.handle];
+        }
     private:
         std::string date_;
         std::string version_;
@@ -70,6 +76,7 @@ namespace sta {
         uint64_t end_time_;
 
         vvars_t vars_;
+        std::unordered_map<fstHandle, FSTValues> var_values_map_;
     };
 
     
