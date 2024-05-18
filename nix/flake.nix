@@ -25,6 +25,8 @@
                     ];
                     nativeBuildInputs = [
                         clang-tools
+                        valgrind
+                        massif-visualizer
                         lldb_15 #lldb_16 seems to be broken
                         gdb
                         swig
