@@ -51,6 +51,7 @@ namespace sta {
         void setStartCycle(int64_t t);
         void setVars(vvars_t &&vars);
         void insertValue(fstHandle var_id, const FSTValue &value);
+        inline void clearValues() { var_values_map_.clear(); };
 
         inline uint64_t startTime() const { return start_time_; }
         inline uint64_t endTime() const { return end_time_; }

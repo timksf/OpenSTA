@@ -59,7 +59,7 @@ namespace sta {
         debugPrint(debug_, "read_fst_activities", 3, "fst file: %s, scope: %s", filename_.c_str(), scope_.c_str());
         //the fst_ object will contain some general information and FSTVar's for all relevant variables (inside of scope_)
         fst_ = reader_.readHierarchy(scope_.c_str());
-        reader_.readAllValues(fst_);
+        // reader_.readAllValues(fst_);
         clk_period_ = INF; //TODO ??
         for (Clock *clk : *sta_->sdc()->clocks())
             clk_period_ = std::min(static_cast<double>(clk->period()), clk_period_);
@@ -76,10 +76,12 @@ namespace sta {
 
     void ReadFSTActivities::setActivities() {
         auto [var_begin, var_end] = fst_.vars();
-        for(auto it = var_begin; it != var_end; ++it){
-            FSTVar &var = *it;
+        report_->reportLine("Total variables to set activities for: %" PRIu64, std::distance(var_begin, var_end));
+        const int CHUNKSIZE = 32;//std::distance(var_begin, var_end);
+        int trailing = std::distance(var_begin, var_end) % CHUNKSIZE;
+        auto process_var = [this](const FSTVar &var){
             if(var.type == FST_VT_VCD_WIRE || var.type == FST_VT_VCD_REG){
-                //strip variable name of root scope prefix for lacating it in sdc network
+                //strip variable name of root scope prefix for locating it in sdc network
                 std::string var_name = var.name;
                 if(scope_.length() > 0){
                     if(var_name.substr(0, scope_.length()) == scope_){
@@ -88,11 +90,28 @@ namespace sta {
                 }
                 setVarActivity(var, var_name);
             }
+        };
+        //process in chunks
+        auto it = var_begin;
+        for(; it != (var_end - trailing); it+=CHUNKSIZE){
+            //load all values relevant to this chunk
+            reader_.readValuesForChunk(fst_, std::make_pair(it, it+CHUNKSIZE));
+            for(auto it1 = it; it1 != it+CHUNKSIZE; it1++) { 
+                process_var(*it1);
+            }
+            fst_.clearValues(); //after a chunk has been processed, delete all corresponding entries
         }
+        fst_.clearValues();
+        //process trailing elements one by one
+        for(;it != var_end; ++it){
+            reader_.readValuesForVar(fst_, *it);
+            process_var(*it);
+            //no clearing since only a few remaining vars are processed
+        }
+
     }
 
     void ReadFSTActivities::setVarActivity(FSTVar var, std::string &var_name){
-        // FSTValues vals = reader_.readValuesForVar(var);
         FSTValues &vals = fst_.valuesForVar(var);
         if(var.length == 1){ //simple case, single signal
             std::string sta_name = netVerilogToSta(var_name.c_str());
